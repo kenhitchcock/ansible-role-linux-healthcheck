@@ -1,0 +1,24 @@
+---
+
+- name: "Total system memory"
+  debug: 
+    msg: "total RAM is {{ ansible_memory_mb.real.total }}"
+  register: linux_healthcheck_memory
+
+- name: "Store memory info"
+  ansible.builtin.blockinfile:
+    path: "/tmp/healthcheck_report.log"
+    create: true
+    block: |
+      Hostname: {{ansible_nodename}}
+      Operating system: {{ansible_distribution_file_variety}} {{ansible_distribution}} {{ansible_distribution_version}}
+      CPU cores: {{ansible_processor_cores}} 
+      Total CPUs: {{ansible_processor_count}}
+      Total threads per core: {{ansible_processor_threads_per_core}}
+      Total System Memory: {{ ansible_memory_mb.real.total }} MB
+      Total Swap Memory Used: {{ ansible_memory_mb.swap.used }} MB
+      SELinx: {{ansible_selinux.mode}} and {{ansible_selinux.status}}
+   
+
+
+

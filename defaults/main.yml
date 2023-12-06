@@ -1,0 +1,18 @@
+---
+
+# Skips checks that need packages installed
+linux_healthcheck_skip_package_install: false 
+
+linux_healthcheck_packages:
+  - openscap
+  - openscap-scanner
+  - scap-security-guide
+
+# Default using the CIS profile for RHEL 9
+linux_healthcheck_run_openscap: false 
+linux_healthcheck_oscap_profile: xccdf_org.ssgproject.content_profile_cis
+linux_healthcheck_oscap_policy: ssg-rhel9-ds
+linux_healthcheck_oscap_reports: "/tmp/openscap_reports"
+
+# Healthcheck jobs
+linux_healthcheck_run_healthcheck: true

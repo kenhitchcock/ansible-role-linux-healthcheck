@@ -1,0 +1,18 @@
+---
+
+- name: "Install packages required for healthchecks."
+  include_tasks: install_packages.yml
+  when:
+    - not linux_healthcheck_skip_package_install
+
+- name: "OpenSCAP Scan and download report."
+  include_tasks: run_openscap.yml
+  when:
+    - linux_healthcheck_run_openscap
+    - not linux_healthcheck_skip_package_install
+
+- name: "Run Healthcheck tests and generate output"
+  include_tasks: run_healthcheck.yml
+  when:
+    - linux_healthcheck_run_healthcheck
+    - not linux_healthcheck_skip_package_install

@@ -1,0 +1,8 @@
+---
+
+- name: "Install Packages required for Health Checks"
+  package:
+    name: "{{ item }}"
+    state: latest
+  with_items: "{{ linux_healthcheck_packages }}"
+

@@ -1,0 +1,18 @@
+---
+
+- block:
+   - name: "Run OpenSCAP"
+     command: oscap xccdf eval \
+       --profile {{ linux_healthcheck_oscap_profile }} \
+       --results-arf /tmp/oscap-arf.xml \
+       --report /tmp/oscap-report.html \
+       --fetch-remote-resources \
+       /usr/share/xml/scap/ssg/content/{{ linux_healthcheck_oscap_policy }}.xml
+     ignore_errors: true
+
+  always:
+   - name: "Download OpenSCAP Report for {{ inventory_hostname }}"
+     fetch:
+       src: "/tmp/oscap-report.html"
+       dest: "{{ linux_healthcheck_oscap_reports }}/{{ inventory_hostname }}.html"
+       flat: yes
