@@ -123,3 +123,10 @@
       {{ linux_heathcheck_rpm_files }}
       Are any of the RPM files signed?:
       {{linux_heathcheck_rpm_files_signed}}
+
+- name: "Download Advanced Healthcheck Report for {{ ansible_hostname }}"
+  fetch:
+    src: "/tmp/healthcheck_advanced_report.log"
+    dest: "{{ linux_healthcheck_reports_location }}/{{ ansible_hostname }}_advanced_healthcheck.txt"
+    flat: yes
+

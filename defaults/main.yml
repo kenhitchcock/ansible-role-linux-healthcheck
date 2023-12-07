@@ -15,6 +15,7 @@ linux_healthcheck_oscap_policy: ssg-rhel9-ds
 linux_healthcheck_oscap_reports: "/tmp/openscap_reports"
 
 # Healthcheck jobs
+linux_healthcheck_reports_location: /tmp/healthchecks
 linux_healthcheck_run_healthcheck: true
 
 # Advanced healthchecks

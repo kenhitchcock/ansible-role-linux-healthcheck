@@ -178,3 +178,10 @@
       #######################################################
       Any SELinux denials today:
       {{linux_heathcheck_selinux_denials.stdout}}
+
+
+- name: "Download Healthcheck Report for {{ ansible_hostname }}"
+  fetch:
+    src: "/tmp/healthcheck_report.log"
+    dest: "{{ linux_healthcheck_reports_location }}/{{ ansible_hostname }}_basic_healthcheck.txt"
+    flat: yes
