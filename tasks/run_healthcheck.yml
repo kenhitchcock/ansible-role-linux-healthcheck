@@ -14,42 +14,97 @@
     cmd: service iptables status
   register: linux_healthcheck_iptables_status
   ignore_errors: true
+  changed_when: false
 
 - name: "IOStat data CPU steal"
   ansible.builtin.shell: 
     cmd: iostat | grep steal -A 2 | awk '{print $5}' | grep -v "%"
   register: linux_healthcheck_iostat_cpu_steal
   ignore_errors: true
+  changed_when: false
 
 - name: "IOStat data CPU wait"
   ansible.builtin.shell: 
     cmd: iostat | grep steal -A 2 | awk '{print $4}' | grep -v "%"
   register: linux_healthcheck_iostat_cpu_wait
   ignore_errors: true
+  changed_when: false
 
-#- name: Ensure that free space on the tested volume is greater than 15%
-#  assert:
-#    that:
-#      - mount.size_available > mount.size_total|float * 0.15
-#    msg: Disk space has reached 85% threshold
-#  vars:
-#    mount: "{{ ansible_mounts | selectattr('mount','equalto',item.mount) | list | first }}"
-#  with_items:
-#    - "{{ ansible_mounts }}"
+- name: "Get Load Average"
+  ansible.builtin.shell: "cat /proc/loadavg"
+  register: linux_healthcheck_load_avg
+  changed_when: false
 
 - name: "Disk Status"
-  debug:
-    msg: "{{ mount.mount }} {{ mount.device }} {{ mount.fstype }} {{ mount.size_total }}"
+  ansible.builtin.set_fact:
+    linux_healthcheck_mounts: Disks currently mounted in the systems are.
+
+- name: "Disk Status"
+  ansible.builtin.set_fact: 
+    linux_healthcheck_mounts: |
+      {{linux_healthcheck_mounts}}
+      {{ mount.mount }} {{ mount.device }} {{ mount.fstype }} {{ mount.size_total|human_readable(isbits=True, unit="G") }}
   vars:
     mount: "{{ ansible_mounts | selectattr('mount','equalto',item.mount) | list | first }}"
   with_items:
     - "{{ ansible_mounts }}"  
+
+- name: "List all block devices attached to the system"
+  ansible.builtin.shell:
+    cmd: lsblk
+  register: linux_healthcheck_block_devices
+  ignore_errors: true
+  changed_when: false
+
+- name: "Check to see what ports are listening for traffic"
+  ansible.builtin.shell:
+    cmd: ss -tuln
+  register: linux_healthcheck_network_ports_listening
+  ignore_errors: true
+  changed_when: false
+
+- name: "Check for any 777 permissions in /home"
+  ansible.builtin.shell:
+    cmd: find /home -perm 777
+  register: linux_healthcheck_home_777perms
+  ignore_errors: true
+  changed_when: false
 
 - name: "Long running tasks"
   ansible.builtin.shell:
     cmd: ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem | head
   register: linux_heathcheck_long_running_tasks
   ignore_errors: true
+  changed_when: false
+
+- name: "Check to see if there are any Journalctl errors or warnings."
+  ansible.builtin.shell:
+    cmd: journalctl | egrep -i "error|warn"
+  register: linux_heathcheck_journalctl_errors
+  ignore_errors: true
+  changed_when: false
+
+- name: "Check to see if there are any SELinux denials today."
+  ansible.builtin.shell:
+    cmd: ausearch -i -m avc -ts today 2>&1
+  register: linux_heathcheck_selinux_denials
+  ignore_errors: true
+  changed_when: false
+
+- name: "Check if any updates are available."
+  ansible.builtin.shell:
+    cmd: dnf check-update
+  register: linux_heathcheck_updates
+  ignore_errors: true
+  changed_when: false
+
+- name: "Query RPMs to see if any configuration files have changed since the installation"
+  ansible.builtin.shell:
+    cmd: rpm -qaV
+  register: linux_heathcheck_rpm_files_verification
+  ignore_errors: true
+  changed_when: false
+
 
 - name: "Create System Report"
   ansible.builtin.blockinfile:
@@ -68,33 +123,58 @@
       # Show the percentage of time spent in involuntary wait by the virtual CPU or  CPUs  while  the hypervisor was servicing another virtual processor.   
       CPU wait percentage: {{linux_healthcheck_iostat_cpu_steal.stdout}}
       # Show  the  percentage  of  time that the CPU or CPUs were idle during which the system had an outstanding disk I/O request.
+      Current System load:
+      {{ linux_healthcheck_load_avg.stdout }}
       #######################################################
       ############## Memory infomation ######################
       #######################################################
       Total System Memory: {{ ansible_memory_mb.real.total }} MB
       Total Free Memory: {{ansible_memory_mb.real.free}} MB
-      iTotal Swap Memory Used: {{ ansible_memory_mb.swap.used }} MB
+      Total Swap Memory Used: {{ ansible_memory_mb.swap.used }} MB
       #######################################################
       ############## Disk infomation ######################
       #######################################################
+      {{ linux_healthcheck_mounts }}
 
-      {{ ansible_mounts }}
+      All the attached block devices:
+      {{linux_healthcheck_block_devices.stdout}}
       #######################################################
       ############## Security infomation ####################
       #######################################################
       SELinx: {{ansible_selinux.mode}} and {{ansible_selinux.status}}
       Firewalld: {{linux_healthcheck_firewalld_status.stdout}}
       iptables service:
-      {{linux_healthcheck_iptables_status.stdout}}  
+      {{linux_healthcheck_iptables_status.stdout}}
+      Files or directories with 777 in /home:
+      {{linux_healthcheck_home_777perms.stdout}}  
       #######################################################
       ############## Network infomation #####################
       #######################################################  
       Network interfaces: {{ansible_interfaces}}
+      Network ports currently listening for traffic:
+      {{linux_healthcheck_network_ports_listening.stdout}}
       #######################################################
       ############## Process infomation #####################
       #######################################################
       Long running tasks:
-      {{linux_heathcheck_long_running_tasks.stdout}}  
-
-
-
+      {{linux_heathcheck_long_running_tasks.stdout}} 
+      #######################################################
+      ############## RPM infomation #########################
+      #######################################################
+      Have any files changed since the RPM was installed?:
+      {{linux_heathcheck_rpm_files_verification.stdout}}
+      #######################################################
+      ############## Updates and Patching infomation ########
+      #######################################################
+      Are any updates available:
+      {{linux_heathcheck_updates.stdout}}
+      #######################################################
+      ############## Journal infomation #####################
+      #######################################################
+      Journalctl Errors or Warnings:
+      {{linux_heathcheck_journalctl_errors.stdout}}
+      #######################################################
+      ############## SELinux denials ########################
+      #######################################################
+      Any SELinux denials today:
+      {{linux_heathcheck_selinux_denials.stdout}}

@@ -1,8 +1,125 @@
 ---
 
+- name: "Check disk write performance."
+  ansible.builtin.shell: |
+    dd if=/dev/zero of={{linux_healthcheck_disk_performance_check_location}}/testdiskperf.img bs=1G count=1 oflag=dsync >/tmp/diskperf.txt 2>&1
+  ignore_errors: true
+  changed_when: false
+
+- name: "Check disk latency."
+  ansible.builtin.shell: |
+    dd if=/dev/zero of={{linux_healthcheck_disk_performance_check_location}}/testdisklat.img bs=512 count=1000 oflag=dsync >/tmp/disklat.txt 2>&1
+  ignore_errors: true
+  changed_when: false
+
+- name: "Check disk read performance"
+  ansible.builtin.shell: | 
+    time dd if={{linux_healthcheck_disk_performance_check_location}}/testdiskperf.img of=/dev/null bs=8k >/tmp/diskreadspeed.txt 2>&1
+  ignore_errors: true
+  changed_when: false
+
+- name: "Output results from write performance."
+  ansible.builtin.shell:
+    cmd: cat /tmp/diskperf.txt
+  register: linux_heathcheck_disk_performance
+  ignore_errors: true
+  changed_when: false
+
+- name: "Output results from disk latency."
+  ansible.builtin.shell:
+    cmd: cat /tmp/disklat.txt
+  register: linux_heathcheck_disk_latency
+  ignore_errors: true
+  changed_when: false
+
+- name: "Output results from disk read."
+  ansible.builtin.shell:
+    cmd: cat /tmp/diskreadspeed.txt
+  register: linux_heathcheck_disk_read_performance
+  ignore_errors: true
+  changed_when: false
+
+- name: "Find any rpm files on the host."
+  ansible.builtin.find:
+    paths: "{{linux_heathcheck_rpm_find_path}}"
+    recurse: true
+    patterns: '*.rpm'
+  register: linux_heathcheck_rpm_files_found
+
+- name: Debug rpms found
+  debug:
+    msg: "{{ item.path }}"
+  with_items: "{{ linux_heathcheck_rpm_files_found.files }}"
+
+- name: "Set fact first."
+  ansible.builtin.set_fact:
+    linux_heathcheck_rpm_files: These RPMs have been found.
+
+- name: "List of rpms found."
+  ansible.builtin.set_fact:
+    linux_heathcheck_rpm_files: |
+      {{linux_heathcheck_rpm_files}}
+      {{item.path}}
+  with_items:
+    - "{{ linux_heathcheck_rpm_files_found.files }}"
+
+- name: "Check if RPMs found were at least signed"
+  ansible.builtin.shell:
+    cmd: rpm --checksig {{item.path}}
+  with_items:
+    - "{{ linux_heathcheck_rpm_files_found.files }}"
+  register: linux_heathcheck_rpm_files_signed_found
+  ignore_errors: true
+  changed_when: false
+
+- name: "Set fact first."
+  ansible.builtin.set_fact:
+    linux_heathcheck_rpm_files_signed: These RPMs have the following signatures.
+
+- name: "List of rpms found."
+  ansible.builtin.set_fact:
+    linux_heathcheck_rpm_files_signed: |
+      {{linux_heathcheck_rpm_files_signed}}
+      {{item.stdout}}
+  with_items:
+    - "{{ linux_heathcheck_rpm_files_signed_found.results }}"
+
+#- name: "Debug output"
+#  debug:
+#    var: item.stdout  
+#  with_items:
+#    - "{{ linux_heathcheck_rpm_files_signed.results  }}"
+
+- name: "Remove test file"
+  ansible.builtin.file:
+    path: "{{item}}"
+    state: absent
+  loop:
+    - "{{linux_healthcheck_disk_performance_check_location}}/testdiskperf.img"
+    - "{{linux_healthcheck_disk_performance_check_location}}/testdisklat.img"
+    - /tmp/diskperf.txt 
+    - /tmp/disklat.txt
+    - /tmp/diskreadspeed.txt
+
 - name: "Create Advanced System Report"
   ansible.builtin.blockinfile:
     path: "/tmp/healthcheck_advanced_report.log"
     create: true
     block: |
       Hostname: {{ansible_hostname}}
+      #######################################################
+      ############## Disk performance #######################
+      #######################################################
+      Disk Write speed: 
+      {{linux_heathcheck_disk_performance.stdout}}
+      Disk Latency:
+      {{linux_heathcheck_disk_latency.stdout}}
+      Disk Read Speed:
+      {{linux_heathcheck_disk_read_performance.stdout}}
+      #######################################################
+      ############## Potential unwanted software ############
+      #######################################################
+      RPM's found on disk:
+      {{ linux_heathcheck_rpm_files }}
+      Are any of the RPM files signed?:
+      {{linux_heathcheck_rpm_files_signed}}

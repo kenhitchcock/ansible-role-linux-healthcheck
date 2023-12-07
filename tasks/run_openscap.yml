@@ -1,5 +1,9 @@
 ---
 
+- name: "Set RHEL distribution for the OpenSCAP policy file to use"
+  ansible.builtin.set_fact:
+    linux_healthcheck_oscap_policy: ssg-rhel{{ansible_distribution_major_version}}-ds
+
 - block:
    - name: "Run OpenSCAP"
      command: oscap xccdf eval \
@@ -11,8 +15,11 @@
      ignore_errors: true
 
   always:
-   - name: "Download OpenSCAP Report for {{ inventory_hostname }}"
+   - name: "Download OpenSCAP Report for {{ ansible_hostname }}"
      fetch:
        src: "/tmp/oscap-report.html"
-       dest: "{{ linux_healthcheck_oscap_reports }}/{{ inventory_hostname }}.html"
+       dest: "{{ linux_healthcheck_oscap_reports }}/{{ ansible_hostname }}.html"
        flat: yes
+
+# todo
+# cleanup files created

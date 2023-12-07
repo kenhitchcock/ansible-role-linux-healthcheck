@@ -19,5 +19,5 @@
 - name: "Run Healthcheck tests and generate output"
   include_tasks: run_advanced_healthcheck.yml
   when:
-    - linux_healthcheck_run_healthcheck
+    - linux_healthcheck_run_advanced_healthcheck
     - not linux_healthcheck_skip_package_install

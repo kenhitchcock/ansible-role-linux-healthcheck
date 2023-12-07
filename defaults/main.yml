@@ -16,3 +16,9 @@ linux_healthcheck_oscap_reports: "/tmp/openscap_reports"
 
 # Healthcheck jobs
 linux_healthcheck_run_healthcheck: true
+
+# Advanced healthchecks
+linux_healthcheck_run_advanced_healthcheck: false
+# This path needs to be able to hold at least 1GB of additional files 
+linux_healthcheck_disk_performance_check_location: /tmp
+linux_heathcheck_rpm_find_path: /home,/tmp,/opt
