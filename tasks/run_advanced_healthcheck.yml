@@ -1,0 +1,8 @@
+---
+
+- name: "Create Advanced System Report"
+  ansible.builtin.blockinfile:
+    path: "/tmp/healthcheck_advanced_report.log"
+    create: true
+    block: |
+      Hostname: {{ansible_hostname}}
