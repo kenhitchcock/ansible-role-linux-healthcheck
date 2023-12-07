@@ -1,24 +1,100 @@
 ---
+- name: collect facts about system services
+  service_facts:
+  register: services_state
 
-- name: "Total system memory"
-  debug: 
-    msg: "total RAM is {{ ansible_memory_mb.real.total }}"
-  register: linux_healthcheck_memory
+- name: "Firewall Status"
+  ansible.builtin.shell:
+    cmd: systemctl status firewalld | grep Active | awk '{print $3}'
+  register: linux_healthcheck_firewalld_status
+  ignore_errors: true
 
-- name: "Store memory info"
+- name: "iptables Status"
+  ansible.builtin.shell:
+    cmd: service iptables status
+  register: linux_healthcheck_iptables_status
+  ignore_errors: true
+
+- name: "IOStat data CPU steal"
+  ansible.builtin.shell: 
+    cmd: iostat | grep steal -A 2 | awk '{print $5}' | grep -v "%"
+  register: linux_healthcheck_iostat_cpu_steal
+  ignore_errors: true
+
+- name: "IOStat data CPU wait"
+  ansible.builtin.shell: 
+    cmd: iostat | grep steal -A 2 | awk '{print $4}' | grep -v "%"
+  register: linux_healthcheck_iostat_cpu_wait
+  ignore_errors: true
+
+#- name: Ensure that free space on the tested volume is greater than 15%
+#  assert:
+#    that:
+#      - mount.size_available > mount.size_total|float * 0.15
+#    msg: Disk space has reached 85% threshold
+#  vars:
+#    mount: "{{ ansible_mounts | selectattr('mount','equalto',item.mount) | list | first }}"
+#  with_items:
+#    - "{{ ansible_mounts }}"
+
+- name: "Disk Status"
+  debug:
+    msg: "{{ mount.mount }} {{ mount.device }} {{ mount.fstype }} {{ mount.size_total }}"
+  vars:
+    mount: "{{ ansible_mounts | selectattr('mount','equalto',item.mount) | list | first }}"
+  with_items:
+    - "{{ ansible_mounts }}"  
+
+- name: "Long running tasks"
+  ansible.builtin.shell:
+    cmd: ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem | head
+  register: linux_heathcheck_long_running_tasks
+  ignore_errors: true
+
+- name: "Create System Report"
   ansible.builtin.blockinfile:
     path: "/tmp/healthcheck_report.log"
     create: true
     block: |
-      Hostname: {{ansible_nodename}}
+      Hostname: {{ansible_hostname}}
       Operating system: {{ansible_distribution_file_variety}} {{ansible_distribution}} {{ansible_distribution_version}}
+      #######################################################
+      ############## CPU infomation #########################
+      #######################################################
       CPU cores: {{ansible_processor_cores}} 
       Total CPUs: {{ansible_processor_count}}
       Total threads per core: {{ansible_processor_threads_per_core}}
+      CPU Steal percentage: {{linux_healthcheck_iostat_cpu_steal.stdout}}
+      # Show the percentage of time spent in involuntary wait by the virtual CPU or  CPUs  while  the hypervisor was servicing another virtual processor.   
+      CPU wait percentage: {{linux_healthcheck_iostat_cpu_steal.stdout}}
+      # Show  the  percentage  of  time that the CPU or CPUs were idle during which the system had an outstanding disk I/O request.
+      #######################################################
+      ############## Memory infomation ######################
+      #######################################################
       Total System Memory: {{ ansible_memory_mb.real.total }} MB
-      Total Swap Memory Used: {{ ansible_memory_mb.swap.used }} MB
+      Total Free Memory: {{ansible_memory_mb.real.free}} MB
+      iTotal Swap Memory Used: {{ ansible_memory_mb.swap.used }} MB
+      #######################################################
+      ############## Disk infomation ######################
+      #######################################################
+
+      {{ ansible_mounts }}
+      #######################################################
+      ############## Security infomation ####################
+      #######################################################
       SELinx: {{ansible_selinux.mode}} and {{ansible_selinux.status}}
-   
+      Firewalld: {{linux_healthcheck_firewalld_status.stdout}}
+      iptables service:
+      {{linux_healthcheck_iptables_status.stdout}}  
+      #######################################################
+      ############## Network infomation #####################
+      #######################################################  
+      Network interfaces: {{ansible_interfaces}}
+      #######################################################
+      ############## Process infomation #####################
+      #######################################################
+      Long running tasks:
+      {{linux_heathcheck_long_running_tasks.stdout}}  
 
 
 
